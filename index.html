@@ -1,79 +1,294 @@
 <!DOCTYPE html>
 <html>
 
-  <head>
-    <meta charset='utf-8'>
-    <meta http-equiv="X-UA-Compatible" content="chrome=1">
-    <meta name="description" content="Arcgis-javascript-communes : ">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title></title>
 
-    <link rel="stylesheet" type="text/css" media="screen" href="stylesheets/stylesheet.css">
+    <link rel="stylesheet" href="http://js.arcgis.com/3.10/js/dojo/dijit/themes/claro/claro.css">
+    <link rel="stylesheet" href="http://js.arcgis.com/3.10/js/esri/css/esri.css">
+    <style>
+    html,
+    body {
+        height: 100%;
+        width: 100%;
+        margin: 0;
+    }
+    body {
+        background-color: #FFF;
+        overflow: hidden;
+        font-family: "Verdana";
+        font-size: 12px;
+    }
+    #mapDiv {
+        border: solid 2px #808775;
+        -moz-border-radius: 4px;
+        -webkit-border-radius: 4px;
+        border-radius: 4px;
+        margin: 5px;
+        padding: 0px;
+    }
+    #measurePane {
+        width: 240px;
+    }
+    #bufferPane {
+        width: 240px;
+    }
+    #rightPane {
+        color: #000;
+        width: 250px;
+        padding-bottom: 15px;
+    }
+    .details {
+        font-size: 14px;
+        font-weight: 600;
+        padding-bottom: 20px;
+    }
+    </style>
+    <script src="//js.arcgis.com/3.10/"></script>
+    <script>
+    // global 
+    var map, tb, symbol, gsvc, featureLayer, circle, app;
+    // loading modules
+    require(["dojo/dom", "dojo/parser", "dojo/_base/array",
+        "esri/config",
+        "esri/map",
+        "esri/Color",
+        "esri/InfoTemplate", "esri/layers/FeatureLayer",
+        "esri/layers/ArcGISDynamicMapServiceLayer",
+        "esri/tasks/GeometryService",
+        "esri/dijit/Measurement",
+        "esri/units",
+        "esri/symbols/SimpleMarkerSymbol",
+        "esri/symbols/SimpleLineSymbol",
+        "esri/symbols/SimpleFillSymbol",
+        "esri/graphic",
+        "esri/tasks/GeometryService",
+        "esri/tasks/BufferParameters",
+        "esri/toolbars/draw",
+        "esri/tasks/query", 
+        "esri/geometry/Circle",
 
-    <title>Arcgis-javascript-communes</title>
-  </head>
+        "esri/dijit/Scalebar",
+        "dijit/layout/BorderContainer",
+        "dijit/layout/ContentPane",
+        "dijit/TitlePane",
+        "dijit/form/CheckBox",
+        "dojo/domReady!"
+    ], function(dom, parser, array, esriConfig, Map, Color, InfoTemplate, FeatureLayer,
+        ArcGISDynamicMapServiceLayer, GeometryService, Measurement, Units,
+        SimpleMarkerSymbol,
+        SimpleLineSymbol, SimpleFillSymbol, Graphic, GeometryService, BufferParameters, Draw,
+        Query, Circle) {
 
-  <body>
+        //
+        // let's rock and roll
+        parser.parse();
 
-    <!-- HEADER -->
-    <div id="header_wrap" class="outer">
-        <header class="inner">
-          <a id="forkme_banner" href="https://github.com/aferrand/ArcGIS-Javascript-Communes">View on GitHub</a>
+        //
+        //
+        //This service is for development and testing purposes only. We recommend that you create your own geometry service for use within your applications
+        //esriConfig.defaults.geometryService 
+        //gsvc = new GeometryService("http://tasks.arcgisonline.com/ArcGIS/rest/services/Geometry/GeometryServer");
+        //gsvc = new GeometryService("http://localhost:6080/arcgis/rest/services/Utilities/Geometry/GeometryServer");
 
-          <h1 id="project_title">Arcgis-javascript-communes</h1>
-          <h2 id="project_tagline"></h2>
+        //
+        //
+        map = new Map("mapDiv", {
+            center: [4.831689, 45.217703],
+            zoom: 6,
+            basemap: "topo"
+        });
 
-            <section id="downloads">
-              <a class="zip_download_link" href="https://github.com/aferrand/ArcGIS-Javascript-Communes/zipball/master">Download this project as a .zip file</a>
-              <a class="tar_download_link" href="https://github.com/aferrand/ArcGIS-Javascript-Communes/tarball/master">Download this project as a tar.gz file</a>
-            </section>
-        </header>
+        ///////////////////////////////////////////////////
+        //
+        //
+        //Takes a URL to a non cached map service.
+        //var dynamicMapServiceLayer = new ArcGISDynamicMapServiceLayer("http://10.128.194.79:6080/arcgis/rest/services/Communes/communes/MapServer", {
+        var dynamicMapServiceLayer = new ArcGISDynamicMapServiceLayer("http://sampleserver6.arcgisonline.com/arcgis/rest/services/DamageAssessment/MapServer", {
+            "opacity": 0.5
+
+        });
+        map.addLayer(dynamicMapServiceLayer);
+
+        ///////////////////////////////////////////////////
+        var measurement = new Measurement({
+            map: map,
+            defaultLengthUnit: Units.KILOMETERS
+        }, dom.byId("measurementDiv"));
+        measurement.hideTool('area');
+        measurement.startup();
+
+        ///////////////////////////////////////////////////
+        //
+        //
+        map.on("load", initOperationalLayer);
+
+        //query = new Query();
+        // query.returnGeometry = false;
+        // query.outFields = ["*"];
+        // query.spatialRelationship = Query["SPATIAL_REL_INTERSECTS"];
+
+        function initOperationalLayer() {
+            var infoTemplate = new InfoTemplate("${POI_NAME}", "Population:  ${POPULATION:NumberFormat}");
+            //featureLayer = new FeatureLayer("http://localhost:6080/arcgis/rest/services/communes/villes/MapServer/0", {
+            featureLayer = new FeatureLayer("http://services.arcgis.com/S3Ai1AW0LHe63cdi/arcgis/rest/services/Villes/FeatureServer/0", {
+                mode: FeatureLayer.MODE_SNAPSHOT,
+                outFields: ["*"],
+                infoTemplate: infoTemplate
+            });
+            map.addLayer(featureLayer);
+            map.infoWindow.resize(250, 75);
+        }
+
+        ///////////////////////////////////////////////////
+        //
+        map.on("load", initToolbar);
+
+        symbol = new SimpleMarkerSymbol(SimpleMarkerSymbol.STYLE_SQUARE, 10, new SimpleLineSymbol(SimpleLineSymbol.STYLE_SOLID, new Color([255, 0, 0]), 1), new Color([0, 255, 0, 0.25]));
+
+        function initToolbar(evtObj) {
+            tb = new Draw(evtObj.map);
+            tb.on("draw-end", doBuffer);
+        }
+
+        function doBuffer(evtObj) {
+            var geometry = evtObj.geometry;
+            tb.deactivate();
+
+            var graphic = new Graphic(geometry, symbol);
+            map.graphics.add(graphic);
+
+            //setup the buffer parameters
+            // var params = new BufferParameters();
+            // params.distances = [dom.byId("distance").value];
+            // params.bufferSpatialReference = map.spatialReference;
+            // params.outSpatialReference = map.spatialReference;
+            // params.unit = GeometryService["UNIT_KILOMETER"];
+            // params.geometries = [geometry];
+            // //
+            // gsvc.buffer(params, showBuffer);
+
+            circle = new Circle({
+                center: geometry,
+                geodesic: true,
+                radius: dom.byId("distance").value,
+                radiusUnit: "esriKilometers"
+            });
+
+            showBuffer([circle]);
+
+
+        }
+
+        function showBuffer(bufferedGeometries) {
+            var sfs = new SimpleFillSymbol(
+                SimpleFillSymbol.STYLE_SOLID,
+                new SimpleLineSymbol(
+                    SimpleLineSymbol.STYLE_SOLID,
+                    new Color([255, 0, 0, 0.65]), 2
+                ),
+                new Color([255, 0, 0, 0.35])
+            );
+
+            array.forEach(bufferedGeometries, function(geometry) {
+                var graphic = new Graphic(geometry, sfs);
+                map.graphics.add(graphic);
+            });
+
+            doQuery(bufferedGeometries);
+
+            map.showZoomSlider();
+
+        }
+
+        ///////////////////////////////////////////////////
+        //
+        //
+        function doQuery(bufferedGeometries) {
+            var geometryExtent = circle.getExtent(); 
+            var query = new Query();
+            query.geometry = geometryExtent;
+            featureLayer.queryFeatures(query, selectInBuffer);
+        }
+
+        function selectInBuffer(response) {
+            var feature;
+            var features = response.features;
+            var inBuffer = [];
+            //filter out features that are not actually in buffer, since we got all points in the buffer's bounding box
+            for (var i = 0; i < features.length; i++) {
+                feature = features[i];
+                if (circle.contains(feature.geometry)) {
+                    inBuffer.push(feature.attributes[featureLayer.objectIdField]);
+                }
+            }
+            var query = new Query();
+            query.objectIds = inBuffer;
+            //use a fast objectIds selection query (should not need to go to the server)
+            featureLayer.selectFeatures(query, FeatureLayer.SELECTION_NEW, function(results) {
+                var totalPopulation = sumPopulation(results);
+                var r = "";
+                r = "<b>La population totale dans la zone est <i>" + totalPopulation + "</i>.</b><br/>";
+                r = r + listeCommunes(results);
+                dom.byId("messages").innerHTML = r;
+            });
+        }
+
+        function sumPopulation(features) {
+            var popTotal = 0;
+            for (var x = 0; x < features.length; x++) {
+                popTotal = popTotal + features[x].attributes["POPULATION"];
+            }
+            return popTotal;
+        }
+
+        function listeCommunes(features) {
+            var liste = "Dans " + features.length + " communes<br/><ul>";
+            for (var x = 0; x < features.length; x++) {
+                liste = liste + "<li>" + features[x].attributes["POI_NAME"] + " - " + features[x].attributes["POPULATION"] + "</li>";
+            }
+            return liste;
+        }
+
+        app ={};
+
+        app.raz = function () {
+            dom.byId("messages").innerHTML = "";
+            map.graphics.clear();
+
+        }
+
+        dom.byId('measurePane_titleBarNode').click();
+    });
+    </script>
+</head>
+
+<body class="claro">
+    <div id="mainWindow" data-dojo-type="dijit/layout/BorderContainer" data-dojo-props="design:'sidebar',gutters:false" style="width:100%; height:100%;">
+        <div id="mapDiv" data-dojo-type="dijit/layout/ContentPane" data-dojo-props="region:'center'">
+            <div style="position:absolute; left:65px; top:20px; z-Index:999;">
+                <div id="measurePane" data-dojo-type="dijit/TitlePane" data-dojo-props="title:'Mesure et position'">
+                    <div id="measurementDiv"></div>
+                </div>
+            </div>
+            <div style="position:absolute; right:20px; top:20px; z-Index:999;">
+                <div id="bufferPane" data-dojo-type="dijit/TitlePane" data-dojo-props="title:'Communes dans rayon'">
+                    <div id="bufferDiv">
+                        <input type="text" id="distance" size="5" value="50" />&nbsp;km
+                        <br/>
+                        <button id="point" data-dojo-type="dijit.form.Button" onclick="app.raz();tb.activate(esri.toolbars.Draw.POINT);map.hideZoomSlider();">Sélectionner</button>
+                        <button id="clear" data-dojo-type="dijit.form.Button" onclick="app.raz();">Effacer</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="rightPane" data-dojo-type="dijit.layout.ContentPane" data-dojo-props="region:'right'">
+            <div id="messages"></div>
+        </div>
     </div>
+</body>
 
-    <!-- MAIN CONTENT -->
-    <div id="main_content_wrap" class="outer">
-      <section id="main_content" class="inner">
-        <h3>
-<a name="welcome-to-github-pages" class="anchor" href="#welcome-to-github-pages"><span class="octicon octicon-link"></span></a>Welcome to GitHub Pages.</h3>
 
-<p>This automatic page generator is the easiest way to create beautiful pages for all of your projects. Author your page content here using GitHub Flavored Markdown, select a template crafted by a designer, and publish. After your page is generated, you can check out the new branch:</p>
-
-<pre><code>$ cd your_repo_root/repo_name
-$ git fetch origin
-$ git checkout gh-pages
-</code></pre>
-
-<p>If you're using the GitHub for Mac, simply sync your repository and you'll see the new branch.</p>
-
-<h3>
-<a name="designer-templates" class="anchor" href="#designer-templates"><span class="octicon octicon-link"></span></a>Designer Templates</h3>
-
-<p>We've crafted some handsome templates for you to use. Go ahead and continue to layouts to browse through them. You can easily go back to edit your page before publishing. After publishing your page, you can revisit the page generator and switch to another theme. Your Page content will be preserved if it remained markdown format.</p>
-
-<h3>
-<a name="rather-drive-stick" class="anchor" href="#rather-drive-stick"><span class="octicon octicon-link"></span></a>Rather Drive Stick?</h3>
-
-<p>If you prefer to not use the automatic generator, push a branch named <code>gh-pages</code> to your repository to create a page manually. In addition to supporting regular HTML content, GitHub Pages support Jekyll, a simple, blog aware static site generator written by our own Tom Preston-Werner. Jekyll makes it easy to create site-wide headers and footers without having to copy them across every page. It also offers intelligent blog support and other advanced templating features.</p>
-
-<h3>
-<a name="authors-and-contributors" class="anchor" href="#authors-and-contributors"><span class="octicon octicon-link"></span></a>Authors and Contributors</h3>
-
-<p>You can <a href="https://github.com/blog/821" class="user-mention">@mention</a> a GitHub username to generate a link to their profile. The resulting <code>&lt;a&gt;</code> element will link to the contributor's GitHub Profile. For example: In 2007, Chris Wanstrath (<a href="https://github.com/defunkt" class="user-mention">@defunkt</a>), PJ Hyett (<a href="https://github.com/pjhyett" class="user-mention">@pjhyett</a>), and Tom Preston-Werner (<a href="https://github.com/mojombo" class="user-mention">@mojombo</a>) founded GitHub.</p>
-
-<h3>
-<a name="support-or-contact" class="anchor" href="#support-or-contact"><span class="octicon octicon-link"></span></a>Support or Contact</h3>
-
-<p>Having trouble with Pages? Check out the documentation at <a href="http://help.github.com/pages">http://help.github.com/pages</a> or contact <a href="mailto:support@github.com">support@github.com</a> and we’ll help you sort it out.</p>
-      </section>
-    </div>
-
-    <!-- FOOTER  -->
-    <div id="footer_wrap" class="outer">
-      <footer class="inner">
-        <p class="copyright">Arcgis-javascript-communes maintained by <a href="https://github.com/aferrand">aferrand</a></p>
-        <p>Published with <a href="http://pages.github.com">GitHub Pages</a></p>
-      </footer>
-    </div>
-
-    
-
-  </body>
 </html>
